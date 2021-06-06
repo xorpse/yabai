@@ -25,6 +25,7 @@
 #include "x86_64/payload.m"
 #elif __arm64__
 #include "arm64/payload.m"
+#include <ptrauth.h>
 #endif
 
 #define SOCKET_PATH_FMT "/tmp/yabai-sa_%s.socket"
@@ -109,14 +110,14 @@ static Class dump_class_info_by_name(const char *name)
     return c;
 }
 
-static uint64_t static_base_address(void)
+uint64_t static_base_address(void)
 {
     const struct segment_command_64 *command = getsegbyname("__TEXT");
     uint64_t addr = command->vmaddr;
     return addr;
 }
 
-static uint64_t image_slide(void)
+uint64_t image_slide(void)
 {
     char path[1024];
     uint32_t size = sizeof(path);
@@ -202,6 +203,29 @@ static void init_instances()
     NSOperatingSystemVersion os_version = [[NSProcessInfo processInfo] operatingSystemVersion];
     if (!verify_os_version(os_version)) return;
 
+#ifdef __arm64__
+    uint64_t baseaddr = image_slide();
+
+    if (payload_compat_major_version != os_version.majorVersion || \
+        payload_compat_minor_version != os_version.minorVersion || \
+        payload_compat_patch_version != os_version.patchVersion || \
+        payload_compat_base != static_base_address()) {
+        NSLog(@"[yabai-sa] payload offsets not compatible with OS version!");
+        return;
+    }
+
+    // globals
+    dock_spaces = [(*(id *)(baseaddr + dock_spaces_addr)) retain];
+    dp_desktop_picture_manager = [(*(id *)(baseaddr + dppm_addr)) retain];
+
+    // function pointers
+    add_space_fp = baseaddr + add_space_addr;
+    remove_space_fp = baseaddr + remove_space_addr;
+    move_space_fp = baseaddr + move_space_addr;
+    set_front_window_fp = baseaddr + set_front_window_addr;
+
+    NSLog(@"[yabai-sa] payload offsets computed relative to %llx", baseaddr);
+#else
     uint64_t baseaddr = static_base_address() + image_slide();
 
     uint64_t dock_spaces_addr = hex_find_seq(baseaddr + get_dock_spaces_offset(os_version), get_dock_spaces_pattern(os_version));
@@ -259,6 +283,7 @@ static void init_instances()
         NSLog(@"[yabai-sa] (0x%llx) setFrontWindow found at address 0x%llX (0x%llx)", baseaddr, set_front_window_addr, set_front_window_addr - baseaddr);
         set_front_window_fp = set_front_window_addr;
     }
+#endif
 
     managed_space = objc_getClass("Dock.ManagedSpace");
     _connection = CGSMainConnectionID();
@@ -406,7 +431,6 @@ static inline id display_space_for_space_with_id(uint64_t space_id)
 
 static void do_space_move(const char *message)
 {
-#ifdef __x86_64__
     Token source_token = get_token(&message);
     uint64_t source_space_id = token_to_uint64t(source_token);
 
@@ -425,7 +449,13 @@ static void do_space_move(const char *message)
     unsigned dest_display_id = ((unsigned (*)(id, SEL, id)) objc_msgSend)(dock_spaces, @selector(displayIDForSpace:), dest_space);
     id dest_display_space = display_space_for_display_uuid(dest_display_uuid);
 
-    asm__call_move_space(source_space, dest_space, dest_display_uuid, dock_spaces, move_space_fp);
+#ifdef __arm64__
+    void (*fptr)(void) = ptrauth_sign_unauthenticated((void (*)())move_space_fp, ptrauth_key_asia, 0);
+#else
+    void (*fptr)(void) = (void (*)())move_space_fp;
+#endif
+
+    asm__call_move_space(source_space, dest_space, dest_display_uuid, dock_spaces, fptr);
 
     dispatch_sync(dispatch_get_main_queue(), ^{
         ((void (*)(id, SEL, id, unsigned, CFStringRef)) objc_msgSend)(dp_desktop_picture_manager, @selector(moveSpace:toDisplay:displayUUID:), source_space, dest_display_id, dest_display_uuid);
@@ -445,7 +475,6 @@ static void do_space_move(const char *message)
 
     CFRelease(source_display_uuid);
     CFRelease(dest_display_uuid);
-#endif
 }
 
 typedef void (*remove_space_call)(id space, id display_space, id dock_spaces, uint64_t space_id1, uint64_t space_id2);
@@ -459,8 +488,15 @@ static void do_space_destroy(const char *message)
     id space = space_for_display_with_id(display_uuid, space_id);
     id display_space = display_space_for_display_uuid(display_uuid);
 
+#ifdef __arm64__
+    remove_space_call fptr = ptrauth_sign_unauthenticated((remove_space_call)remove_space_fp, ptrauth_key_asia, 0);
+#else
+    remove_space_call fptr = (remove_space_call)remove_space_fp;
+
+#endif
+
     dispatch_sync(dispatch_get_main_queue(), ^{
-        ((remove_space_call) remove_space_fp)(space, display_space, dock_spaces, space_id, space_id);
+        fptr(space, display_space, dock_spaces, space_id, space_id);
     });
 
     if (active_space_id == space_id) {
@@ -474,17 +510,23 @@ static void do_space_destroy(const char *message)
 
 static void do_space_create(const char *message)
 {
-#ifdef __x86_64__
     Token space_id_token = get_token(&message);
     uint64_t space_id = token_to_uint64t(space_id_token);
     CFStringRef __block display_uuid = CGSCopyManagedDisplayForSpace(_connection, space_id);
+
+#ifdef __arm64__
+    void (*fptr)(void) = ptrauth_sign_unauthenticated((void (*)(void))add_space_fp, ptrauth_key_asia, 0);
+#else
+    void (*fptr)(void) = (void (*)(void))add_space_fp;
+#endif
+
     dispatch_sync(dispatch_get_main_queue(), ^{
         id new_space = [[managed_space alloc] init];
         id display_space = display_space_for_display_uuid(display_uuid);
-        asm__call_add_space(new_space, display_space, add_space_fp);
+
+        asm__call_add_space(new_space, display_space, fptr);
         CFRelease(display_uuid);
     });
-#endif
 }
 
 static void do_space_change(const char *message)
@@ -639,7 +681,13 @@ static void do_window_focus(const char *message)
     CGSGetWindowOwner(_connection, window_id, &window_connection);
     CGSGetConnectionPSN(window_connection, &window_psn);
 
-    ((focus_window_call) set_front_window_fp)(window_psn, window_id);
+#if __arm64__
+    focus_window_call fptr = ptrauth_sign_unauthenticated((focus_window_call)set_front_window_fp, ptrauth_key_asia, 0);
+#else
+    focus_window_call fptr = (focus_window_call)set_front_window_fp;
+#endif
+
+    fptr(window_psn, window_id);
 }
 
 static void do_window_shadow(const char *message)

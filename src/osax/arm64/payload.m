@@ -1,3 +1,103 @@
+//
+// MOV             X8, X0
+// LDR             X0, [X20,#0x10]
+// MOV             X20, X8 ; eqv. r13 for x86-64 (display_space)
+// BL              getAddSpaceOffset
+//
+static void asm__call_add_space(id new_space, id display_space, void(*fptr)(void)) {
+    __asm__ __volatile__(
+        "mov x0, %0\n"
+        "mov x20, %1\n"
+        ::
+        "r"(new_space),
+        "r"(display_space)
+        : "x0", "x20");
+    fptr();
+}
+
+//
+// loc_100168C98
+// ADRP            X8, #g_dock_spaces_ptr@PAGE
+// NOP
+// LDR             X20, [X8,#g_dock_spaces_ptr@PAGEOFF]
+// CBZ             X20, loc_100168F68
+// ...
+// loc_100168CC4
+// LDR             W26, [X21,#0x38]
+// BL              sub_10016A9C8
+// MOV             X0, X28 ; int
+// MOV             X1, X19 ; int
+// MOV             X2, X26 ; int
+// BL              getMoveSpaceOffset
+//
+static void asm__call_move_space(id source_space, id dest_space, CFStringRef dest_display_uuid, id dock_spaces, void(*fptr)(void)) {
+    __asm__ __volatile__(
+        "mov x0, %0\n"
+        "mov x1, %1\n"
+        "mov x2, %2\n"
+        "mov x20, %3\n"
+        ::
+        "r"(source_space),
+        "r"(dest_space),
+        "r"(dest_display_uuid),
+        "r"(dock_spaces)
+        : "x0", "x1", "x2", "x20");
+    fptr();
+}
+
+// __DPDesktopPictureManager__addDisplay_notifyWindowServer__
+//
+// where this is the address of the ID passed:
+//
+// lea     r13, g_dock_spaces_ptr
+// mov     rdi, [r13+0]    ; id
+// mov     rsi, cs:selRef_currentSpaceForDisplay_ ; SEL
+//
+// ADRL            X21, g_dock_spaces_ptr
+// LDR             X0, [X21] ; id
+// ADRP            X8, #selRef_currentSpaceForDisplay_@PAGE
+// LDR             X1, [X8,#selRef_currentSpaceForDisplay_@PAGEOFF] ; SEL
+//
+const uint64_t dock_spaces_addr = 0x1004264D0ULL;
+
+// __DPDesktopPictureManager_init_
+//
+// where this is the address of the ID passed:
+//
+// mov     rcx, cs:classRef_DPDesktopPictureManager_0
+// mov     [rax+8], rcx
+// mov     rsi, cs:selRef_init ; SEL
+// mov     rdi, rax        ; objc_super *
+// call    _objc_msgSendSuper2
+// mov     r15, rax
+// lea     rdi, g_dppm     ; location
+// mov     rsi, rax        ; obj
+// call    _objc_storeStrong
+//
+// ADRP            X8, #classRef_DPDesktopPictureManager_0@PAGE
+// LDR             X8, [X8,#classRef_DPDesktopPictureManager_0@PAGEOFF]
+// STP             X0, X8, [SP,#0x280+var_128]
+// ADRP            X8, #selRef_init@PAGE
+// LDR             X1, [X8,#selRef_init@PAGEOFF] ; SEL
+// ADD             X0, SP, #0x280+var_128 ; objc_super *
+// BL              _objc_msgSendSuper2
+// MOV             X19, X0
+// ADRL            X0, g_dppm ; location
+// MOV             X1, X19 ; obj
+// BL              _objc_storeStrong
+const uint64_t dppm_addr = 0x100426550ULL;
+
+const uint64_t add_space_addr = 0x100225DE0ULL;
+const uint64_t remove_space_addr = 0x1002D6A58ULL;
+const uint64_t move_space_addr = 0x1002C8ED0ULL;
+const uint64_t set_front_window_addr = 0x10004FBD8ULL;
+
+const uint64_t payload_compat_base = 0x100000000ULL;
+const NSInteger payload_compat_major_version = 11;
+const NSInteger payload_compat_minor_version = 3;
+const NSInteger payload_compat_patch_version = 1;
+
+/*
 uint64_t get_dock_spaces_offset(NSOperatingSystemVersion os_version) {
     if ((os_version.majorVersion == 11) || (os_version.majorVersion == 10 && os_version.minorVersion == 16)) {
         return 0x0;
@@ -81,3 +181,4 @@ const char *get_set_front_window_pattern(NSOperatingSystemVersion os_version) {
     }
     return NULL;
 }
+*/

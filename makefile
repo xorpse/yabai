@@ -21,13 +21,13 @@ install: clean-build $(BINS)
 
 $(OSAX_SRC): $(OSAX_PATH)/loader.m $(OSAX_PATH)/payload.m $(OSAX_PATH)/mach_bootstrap.c
 	clang $(OSAX_PATH)/loader.m -shared -O2 -mmacosx-version-min=10.13 -o $(OSAX_PATH)/loader -framework Foundation
-	clang $(OSAX_PATH)/payload.m -shared -fPIC -O2 -mmacosx-version-min=10.13 -o $(OSAX_PATH)/payload -framework Foundation -framework Carbon
+	clang $(OSAX_PATH)/payload.m -shared -fPIC -O2 -mmacosx-version-min=10.13 -o $(OSAX_PATH)/payload -arch arm64e -framework Foundation -framework Carbon
 	clang $(OSAX_PATH)/mach_bootstrap.c -shared -fPIC -O2 -mmacosx-version-min=10.13 -o $(OSAX_PATH)/mach_bootstrap -framework Carbon -lpthread
 	xxd -i -a $(OSAX_PATH)/loader $(OSAX_PATH)/sa_loader.c
 	xxd -i -a $(OSAX_PATH)/payload $(OSAX_PATH)/sa_payload.c
 	xxd -i -a $(OSAX_PATH)/mach_bootstrap $(OSAX_PATH)/sa_mach_bootstrap.c
 	rm -f $(OSAX_PATH)/loader
-	rm -f $(OSAX_PATH)/payload
+	#rm -f $(OSAX_PATH)/payload
 	rm -f $(OSAX_PATH)/mach_bootstrap
 
 man:
