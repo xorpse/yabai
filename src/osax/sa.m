@@ -1,5 +1,9 @@
 #include "sa.h"
 
+#ifdef __arm64__
+#include "arm64/injector.h"
+#endif
+
 extern int csr_get_active_config(uint32_t *config);
 #define CSR_ALLOW_UNRESTRICTED_FS 0x02
 #define CSR_ALLOW_TASK_FOR_PID    0x04
@@ -29,8 +33,10 @@ static char osax_payload_contents_macos_dir[MAXLEN];
 static char osax_info_plist[MAXLEN];
 static char osax_sdefn_file[MAXLEN];
 static char osax_payload_plist[MAXLEN];
+#ifndef __arm64__
 static char osax_bin_mach_bootstrap[MAXLEN];
 static char osax_bin_loader[MAXLEN];
+#endif
 static char osax_bin_payload[MAXLEN];
 
 static char sa_def[] =
@@ -134,8 +140,10 @@ static void scripting_addition_set_path(void)
     snprintf(osax_sdefn_file, sizeof(osax_sdefn_file), "%s/%s", osax_contents_res_dir, "yabai.sdef");
 
     snprintf(osax_payload_plist, sizeof(osax_payload_plist), "%s/%s", osax_payload_contents_dir, "Info.plist");
+#ifndef __arm64__
     snprintf(osax_bin_mach_bootstrap, sizeof(osax_bin_mach_bootstrap), "%s/%s", osax_contents_macos_dir, "mach_bootstrap");
     snprintf(osax_bin_loader, sizeof(osax_bin_loader), "%s/%s", osax_contents_macos_dir, "loader");
+#endif
     snprintf(osax_bin_payload, sizeof(osax_bin_payload), "%s/%s", osax_payload_contents_macos_dir, "payload");
 }
 
@@ -169,11 +177,13 @@ static void scripting_addition_prepare_binaries(void)
 {
     char cmd[MAXLEN];
 
+#ifndef __arm64__
     snprintf(cmd, sizeof(cmd), "%s %s", "chmod +x", osax_bin_loader);
     system(cmd);
 
     snprintf(cmd, sizeof(cmd), "%s %s %s", "codesign -f -s -", osax_bin_loader, "2>/dev/null");
     system(cmd);
+#endif
 
     snprintf(cmd, sizeof(cmd), "%s %s", "chmod +x", osax_bin_payload);
     system(cmd);
@@ -245,6 +255,7 @@ static void scripting_addition_restart_dock(void)
     [dock makeObjectsPerformSelector:@selector(terminate)];
 }
 
+#ifndef __arm64__
 static pid_t scripting_addition_get_dock_pid(void)
 {
     NSArray *list = [NSRunningApplication runningApplicationsWithBundleIdentifier:@"com.apple.dock"];
@@ -256,6 +267,7 @@ static pid_t scripting_addition_get_dock_pid(void)
 
     return 0;
 }
+#endif
 
 static bool scripting_addition_is_sip_friendly(void)
 {
@@ -337,6 +349,7 @@ int scripting_addition_install(void)
         goto cleanup;
     }
 
+#ifndef __arm64__
     if (!scripting_addition_write_file((char *) __src_osax_mach_bootstrap, __src_osax_mach_bootstrap_len, osax_bin_mach_bootstrap, "wb")) {
         goto cleanup;
     }
@@ -344,6 +357,7 @@ int scripting_addition_install(void)
     if (!scripting_addition_write_file((char *) __src_osax_loader, __src_osax_loader_len, osax_bin_loader, "wb")) {
         goto cleanup;
     }
+#endif
 
     if (!scripting_addition_write_file((char *) __src_osax_payload, __src_osax_payload_len, osax_bin_payload, "wb")) {
         goto cleanup;
@@ -428,6 +442,21 @@ int scripting_addition_load(void)
             return 1;
         }
 
+#ifdef __arm64__
+        if (inject_yabai()) {
+            debug("yabai: scripting-addition successfully injected payload into Dock.app..\n");
+            if (drop_sudo_privileges_and_set_sa_socket_path()) {
+              sleep(1);
+              scripting_addition_perform_validation(false);
+              sleep(1);
+            }
+        } else {
+            warn("yabai: scripting-addition failed to inject payload into Dock.app!\n");
+            notify("scripting-addition", "failed to inject payload into Dock.app!");
+            return 1;
+        }
+        return 0;
+#else
         pid_t pid = scripting_addition_get_dock_pid();
         if (!pid) {
             notify("scripting-addition", "could not locate pid of Dock.app!");
@@ -450,6 +479,7 @@ int scripting_addition_load(void)
             sleep(1);
             return 1;
         }
+#endif
     } else {
         if (is_root()) {
             warn("yabai: scripting-addition should not be loaded as root!\n");
