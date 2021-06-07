@@ -206,23 +206,21 @@ static void init_instances()
 #ifdef __arm64__
     uint64_t baseaddr = image_slide();
 
-    if (payload_compat_major_version != os_version.majorVersion || \
-        payload_compat_minor_version != os_version.minorVersion || \
-        payload_compat_patch_version != os_version.patchVersion || \
+    if (get_dppm_addr(os_version) == 0 || \
         payload_compat_base != static_base_address()) {
         NSLog(@"[yabai-sa] payload offsets not compatible with OS version!");
         return;
     }
 
     // globals
-    dock_spaces = [(*(id *)(baseaddr + dock_spaces_addr)) retain];
-    dp_desktop_picture_manager = [(*(id *)(baseaddr + dppm_addr)) retain];
+    dock_spaces = [(*(id *)(baseaddr + get_dock_spaces_addr(os_version))) retain];
+    dp_desktop_picture_manager = [(*(id *)(baseaddr + get_dppm_addr(os_version))) retain];
 
     // function pointers
-    add_space_fp = baseaddr + add_space_addr;
-    remove_space_fp = baseaddr + remove_space_addr;
-    move_space_fp = baseaddr + move_space_addr;
-    set_front_window_fp = baseaddr + set_front_window_addr;
+    add_space_fp = baseaddr + get_add_space_addr(os_version);
+    remove_space_fp = baseaddr + get_remove_space_addr(os_version);
+    move_space_fp = baseaddr + get_move_space_addr(os_version);
+    set_front_window_fp = baseaddr + get_set_front_window_addr(os_version);
 
     NSLog(@"[yabai-sa] payload offsets computed relative to %llx", baseaddr);
 #else

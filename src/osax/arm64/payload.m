@@ -58,7 +58,22 @@ static void asm__call_move_space(id source_space, id dest_space, CFStringRef des
 // ADRP            X8, #selRef_currentSpaceForDisplay_@PAGE
 // LDR             X1, [X8,#selRef_currentSpaceForDisplay_@PAGEOFF] ; SEL
 //
-const uint64_t dock_spaces_addr = 0x1004264D0ULL;
+
+static uint64_t get_dock_spaces_addr(NSOperatingSystemVersion ver) {
+  if (ver.majorVersion != 11) {
+    return 0;
+  }
+
+  if (ver.minorVersion == 3 && ver.patchVersion == 1) {
+    return 0x1004264D0ULL;
+  }
+
+  if (ver.minorVersion == 4) {
+    return 0x100426500ULL;
+  }
+
+  return 0;
+}
 
 // __DPDesktopPictureManager_init_
 //
@@ -85,17 +100,88 @@ const uint64_t dock_spaces_addr = 0x1004264D0ULL;
 // ADRL            X0, g_dppm ; location
 // MOV             X1, X19 ; obj
 // BL              _objc_storeStrong
-const uint64_t dppm_addr = 0x100426550ULL;
 
-const uint64_t add_space_addr = 0x100225DE0ULL;
-const uint64_t remove_space_addr = 0x1002D6A58ULL;
-const uint64_t move_space_addr = 0x1002C8ED0ULL;
-const uint64_t set_front_window_addr = 0x10004FBD8ULL;
+static uint64_t get_dppm_addr(NSOperatingSystemVersion ver) {
+  if (ver.majorVersion != 11) {
+    return 0;
+  }
+
+  if (ver.minorVersion == 3 && ver.patchVersion == 1) {
+    return 0x100426550ULL;
+  }
+
+  if (ver.minorVersion == 4) {
+    return 0x100426580ULL;
+  }
+
+  return 0;
+}
+
+static uint64_t get_add_space_addr(NSOperatingSystemVersion ver) {
+  if (ver.majorVersion != 11) {
+    return 0;
+  }
+
+  if (ver.minorVersion == 3 && ver.patchVersion == 1) {
+    return 0x100225DE0ULL;
+  }
+
+  if (ver.minorVersion == 4) {
+    return 0x1002259D0ULL;
+  }
+
+  return 0;
+}
+
+static uint64_t get_remove_space_addr(NSOperatingSystemVersion ver) {
+  if (ver.majorVersion != 11) {
+    return 0;
+  }
+
+  if (ver.minorVersion == 3 && ver.patchVersion == 1) {
+    return 0x1002D6A58ULL;
+  }
+
+  if (ver.minorVersion == 4) {
+    return 0x1002D668CULL;
+  }
+
+  return 0;
+}
+
+static uint64_t get_move_space_addr(NSOperatingSystemVersion ver) {
+  if (ver.majorVersion != 11) {
+    return 0;
+  }
+
+  if (ver.minorVersion == 3 && ver.patchVersion == 1) {
+    return 0x1002C8ED0ULL;
+  }
+
+  if (ver.minorVersion == 4) {
+    return 0x1002C8B04ULL;
+  }
+
+  return 0;
+}
+
+static uint64_t get_set_front_window_addr(NSOperatingSystemVersion ver) {
+  if (ver.majorVersion != 11) {
+    return 0;
+  }
+
+  if (ver.minorVersion == 3 && ver.patchVersion == 1) {
+    return 0x10004FBD8ULL;
+  }
+
+  if (ver.minorVersion == 4) {
+    return 0x10004F5FCULL;
+  }
+
+  return 0;
+}
 
 const uint64_t payload_compat_base = 0x100000000ULL;
-const NSInteger payload_compat_major_version = 11;
-const NSInteger payload_compat_minor_version = 3;
-const NSInteger payload_compat_patch_version = 1;
 
 /*
 uint64_t get_dock_spaces_offset(NSOperatingSystemVersion os_version) {
