@@ -192,9 +192,11 @@ static bool verify_os_version(NSOperatingSystemVersion os_version)
         }
     } else if (os_version.majorVersion == 11) {
         return true; // Big Sur 11.0
+    } else if (os_version.majorVersion == 12) {
+        return true; // Monterey 12.x
     }
 
-    NSLog(@"[yabai-sa] spaces functionality is only supported on macOS High Sierra 10.13.6, Mojave 10.14.4-6, Catalina 10.15.0-6 and Big Sur 11.0");
+    NSLog(@"[yabai-sa] spaces functionality is only supported on macOS High Sierra 10.13.6, Mojave 10.14.4-6, Catalina 10.15.0-6, Big Sur 11.x, and Monterey 12.x");
     return false;
 }
 

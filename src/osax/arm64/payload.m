@@ -60,16 +60,16 @@ static void asm__call_move_space(id source_space, id dest_space, CFStringRef des
 //
 
 static uint64_t get_dock_spaces_addr(NSOperatingSystemVersion ver) {
-  if (ver.majorVersion != 11) {
-    return 0;
-  }
+  if (ver.majorVersion == 11) {
+    if (ver.minorVersion == 3 && ver.patchVersion == 1) {
+      return 0x1004264D0ULL;
+    }
 
-  if (ver.minorVersion == 3 && ver.patchVersion == 1) {
-    return 0x1004264D0ULL;
-  }
-
-  if (ver.minorVersion == 4) {
-    return 0x100426500ULL;
+    if (ver.minorVersion == 4) {
+      return 0x100426500ULL;
+    }
+  } else if (ver.majorVersion == 12) {
+    return 0x10042FDD0ULL;
   }
 
   return 0;
@@ -102,80 +102,80 @@ static uint64_t get_dock_spaces_addr(NSOperatingSystemVersion ver) {
 // BL              _objc_storeStrong
 
 static uint64_t get_dppm_addr(NSOperatingSystemVersion ver) {
-  if (ver.majorVersion != 11) {
-    return 0;
-  }
+  if (ver.majorVersion == 11) {
+    if (ver.minorVersion == 3 && ver.patchVersion == 1) {
+      return 0x100426550ULL;
+    }
 
-  if (ver.minorVersion == 3 && ver.patchVersion == 1) {
-    return 0x100426550ULL;
-  }
-
-  if (ver.minorVersion == 4) {
-    return 0x100426580ULL;
+    if (ver.minorVersion == 4) {
+      return 0x100426580ULL;
+    }
+  } else if (ver.majorVersion == 12) {
+    return 0x10042FE50ULL;
   }
 
   return 0;
 }
 
 static uint64_t get_add_space_addr(NSOperatingSystemVersion ver) {
-  if (ver.majorVersion != 11) {
-    return 0;
-  }
+  if (ver.majorVersion == 11) {
+    if (ver.minorVersion == 3 && ver.patchVersion == 1) {
+      return 0x100225DE0ULL;
+    }
 
-  if (ver.minorVersion == 3 && ver.patchVersion == 1) {
-    return 0x100225DE0ULL;
-  }
-
-  if (ver.minorVersion == 4) {
-    return 0x1002259D0ULL;
+    if (ver.minorVersion == 4) {
+      return 0x1002259D0ULL;
+    }
+  } else if (ver.majorVersion == 12) {
+    return 0x10022B93CULL;
   }
 
   return 0;
 }
 
 static uint64_t get_remove_space_addr(NSOperatingSystemVersion ver) {
-  if (ver.majorVersion != 11) {
-    return 0;
-  }
+  if (ver.majorVersion == 11) {
+    if (ver.minorVersion == 3 && ver.patchVersion == 1) {
+      return 0x1002D6A58ULL;
+    }
 
-  if (ver.minorVersion == 3 && ver.patchVersion == 1) {
-    return 0x1002D6A58ULL;
-  }
-
-  if (ver.minorVersion == 4) {
-    return 0x1002D668CULL;
+    if (ver.minorVersion == 4) {
+      return 0x1002D668CULL;
+    }
+  } else if (ver.majorVersion == 12) {
+    return 0x1002DE224ULL;
   }
 
   return 0;
 }
 
 static uint64_t get_move_space_addr(NSOperatingSystemVersion ver) {
-  if (ver.majorVersion != 11) {
-    return 0;
-  }
+  if (ver.majorVersion == 11) {
+    if (ver.minorVersion == 3 && ver.patchVersion == 1) {
+      return 0x1002C8ED0ULL;
+    }
 
-  if (ver.minorVersion == 3 && ver.patchVersion == 1) {
-    return 0x1002C8ED0ULL;
-  }
-
-  if (ver.minorVersion == 4) {
-    return 0x1002C8B04ULL;
+    if (ver.minorVersion == 4) {
+      return 0x1002C8B04ULL;
+    }
+  } else if (ver.majorVersion == 12) {
+    return 0x1002CFA8CULL;
   }
 
   return 0;
 }
 
 static uint64_t get_set_front_window_addr(NSOperatingSystemVersion ver) {
-  if (ver.majorVersion != 11) {
-    return 0;
-  }
+  if (ver.majorVersion == 11) {
+    if (ver.minorVersion == 3 && ver.patchVersion == 1) {
+      return 0x10004FBD8ULL;
+    }
 
-  if (ver.minorVersion == 3 && ver.patchVersion == 1) {
-    return 0x10004FBD8ULL;
-  }
-
-  if (ver.minorVersion == 4) {
-    return 0x10004F5FCULL;
+    if (ver.minorVersion == 4) {
+      return 0x10004F5FCULL;
+    }
+  } else if (ver.majorVersion == 12) {
+    return 0x10004E9D4ULL;
   }
 
   return 0;
