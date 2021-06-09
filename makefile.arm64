@@ -33,7 +33,7 @@ $(FRIDA_DEVKIT_FILES):
 	rm ./frida/frida-core-example.c ./frida/devkit.tar.xz
 
 $(OSAX_SRC): $(FRIDA_DEVKIT_FILES) $(OSAX_PATH)/arm64/injector.c $(OSAX_PATH)/payload.m
-	clang -c $(OSAX_PATH)/arm64/injector.c -o $(OSAX_PATH)/arm64/injector.o -I./frida -isysroot "$(shell xcrun --sdk macosx --show-sdk-path)"
+	clang -c $(OSAX_PATH)/arm64/injector.c -o $(OSAX_PATH)/arm64/injector.o -I./frida -arch arm64 -isysroot "$(shell xcrun --sdk macosx --show-sdk-path)"
 	clang $(OSAX_PATH)/payload.m -shared -fPIC -O2 -mmacosx-version-min=10.13 -o $(OSAX_PATH)/payload -arch arm64e -framework Foundation -framework Carbon
 	xxd -i -a $(OSAX_PATH)/payload $(OSAX_PATH)/sa_payload.c
 	rm -f $(OSAX_PATH)/payload
@@ -65,4 +65,4 @@ clean: clean-build
 
 $(BUILD_PATH)/yabai: $(YABAI_SRC)
 	mkdir -p $(BUILD_PATH)
-	clang $^ $(BUILD_FLAGS) $(FRAMEWORK_PATH) $(FRAMEWORK) -o $@
+	clang $^ $(BUILD_FLAGS) -arch arm64 $(FRAMEWORK_PATH) $(FRAMEWORK) -o $@
