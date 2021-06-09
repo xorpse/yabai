@@ -34,7 +34,9 @@
 #include "misc/socket.c"
 
 #include "osax/sa.h"
+#ifndef __arm64__
 #include "osax/mach_loader.c"
+#endif
 #include "osax/sa.m"
 
 #include "event.h"

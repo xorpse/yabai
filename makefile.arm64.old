@@ -1,0 +1,68 @@
+FRAMEWORK_PATH = -F/System/Library/PrivateFrameworks
+FRAMEWORK      = -framework Carbon -framework Cocoa -framework CoreServices -framework SkyLight -framework ScriptingBridge
+BUILD_FLAGS    = -std=c99 -Wall -fPIC -g -O0 -fvisibility=hidden -mmacosx-version-min=10.13 -L./frida -lfrida-core -lbsm -lm -ldl -lpthread -lresolv -Wl,-framework,Foundation,-framework,AppKit -pthread -isysroot "$(shell xcrun --sdk macosx --show-sdk-path)" -Wl,-dead_strip
+BUILD_PATH     = ./bin
+DOC_PATH       = ./doc
+SCRIPT_PATH    = ./scripts
+ASSET_PATH     = ./assets
+SMP_PATH       = ./examples
+ARCH_PATH      = ./archive
+OSAX_SRC       = ./src/osax/arm64/injector.o ./src/osax/sa_payload.c
+YABAI_SRC      = ./src/manifest.m $(OSAX_SRC)
+OSAX_PATH      = ./src/osax
+BINS           = $(BUILD_PATH)/yabai
+
+# ARM64 injector
+FRIDA_MAJOR        = 14
+FRIDA_MINOR        = 2
+FRIDA_PATCH        = 18
+FRIDA_DEVKIT       = https://github.com/frida/frida/releases/download/${FRIDA_MAJOR}.${FRIDA_MINOR}.${FRIDA_PATCH}/frida-core-devkit-${FRIDA_MAJOR}.${FRIDA_MINOR}.${FRIDA_PATCH}-macos-arm64.tar.xz
+FRIDA_DEVKIT_FILES = ./frida/frida-core.h ./frida/libfrida-core.a
+
+.PHONY: all clean install sign archive man
+
+all: clean-build $(BINS)
+
+install: BUILD_FLAGS=-std=c99 -Wall -DNDEBUG -fPIC -O2 -fvisibility=hidden -mmacosx-version-min=10.13 -L./frida -lfrida-core -lbsm -lm -ldl -lpthread -lresolv -Wl,-framework,Foundation,-framework,AppKit -pthread -isysroot "$(shell xcrun --sdk macosx --show-sdk-path)" -Wl,-dead_strip
+install: clean-build $(BINS)
+
+$(FRIDA_DEVKIT_FILES):
+	mkdir -p ./frida
+	curl -L -o ./frida/devkit.tar.xz ${FRIDA_DEVKIT}
+	tar xJf ./frida/devkit.tar.xz -C ./frida
+	rm ./frida/frida-core-example.c ./frida/devkit.tar.xz
+
+$(OSAX_SRC): $(FRIDA_DEVKIT_FILES) $(OSAX_PATH)/arm64/injector.c $(OSAX_PATH)/payload.m
+	clang -c $(OSAX_PATH)/arm64/injector.c -o $(OSAX_PATH)/arm64/injector.o -I./frida -arch arm64e -isysroot "$(shell xcrun --sdk macosx --show-sdk-path)"
+	clang $(OSAX_PATH)/payload.m -shared -fPIC -O2 -mmacosx-version-min=10.13 -o $(OSAX_PATH)/payload -arch arm64e -framework Foundation -framework Carbon
+	xxd -i -a $(OSAX_PATH)/payload $(OSAX_PATH)/sa_payload.c
+	rm -f $(OSAX_PATH)/payload
+
+man:
+	asciidoctor -b manpage $(DOC_PATH)/yabai.asciidoc -o $(DOC_PATH)/yabai.1
+
+icon:
+	python $(SCRIPT_PATH)/seticon.py $(ASSET_PATH)/icon/2x/icon-512px@2x.png $(BUILD_PATH)/yabai
+
+archive: man install sign icon
+	rm -rf $(ARCH_PATH)
+	mkdir -p $(ARCH_PATH)
+	cp -r $(BUILD_PATH) $(ARCH_PATH)/
+	cp -r $(DOC_PATH) $(ARCH_PATH)/
+	cp -r $(SMP_PATH) $(ARCH_PATH)/
+	tar -cvzf $(BUILD_PATH)/$(shell $(BUILD_PATH)/yabai --version).tar.gz $(ARCH_PATH)
+	rm -rf $(ARCH_PATH)
+
+sign:
+	codesign -fs "yabai-cert" $(BUILD_PATH)/yabai
+
+clean-build:
+	rm -rf $(BUILD_PATH)
+
+clean: clean-build
+	rm -f $(OSAX_SRC)
+	rm -f $(FRIDA_DEVKIT_FILES)
+
+$(BUILD_PATH)/yabai: $(YABAI_SRC)
+	mkdir -p $(BUILD_PATH)
+	clang $^ $(BUILD_FLAGS) -arch arm64e $(FRAMEWORK_PATH) $(FRAMEWORK) -o $@

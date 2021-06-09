@@ -255,7 +255,6 @@ static void scripting_addition_restart_dock(void)
     [dock makeObjectsPerformSelector:@selector(terminate)];
 }
 
-#ifndef __arm64__
 static pid_t scripting_addition_get_dock_pid(void)
 {
     NSArray *list = [NSRunningApplication runningApplicationsWithBundleIdentifier:@"com.apple.dock"];
@@ -267,7 +266,6 @@ static pid_t scripting_addition_get_dock_pid(void)
 
     return 0;
 }
-#endif
 
 static bool scripting_addition_is_sip_friendly(void)
 {
@@ -442,8 +440,16 @@ int scripting_addition_load(void)
             return 1;
         }
 
+        pid_t pid = scripting_addition_get_dock_pid();
+        if (!pid) {
+            notify("scripting-addition", "could not locate pid of Dock.app!");
+            warn("yabai: scripting-addition could not locate pid of Dock.app!\n");
+            sleep(1);
+            return 1;
+        }
+
 #ifdef __arm64__
-        if (inject_yabai()) {
+        if (inject(pid) == KERN_SUCCESS) {
             debug("yabai: scripting-addition successfully injected payload into Dock.app..\n");
             if (drop_sudo_privileges_and_set_sa_socket_path()) {
               sleep(1);
@@ -457,14 +463,6 @@ int scripting_addition_load(void)
         }
         return 0;
 #else
-        pid_t pid = scripting_addition_get_dock_pid();
-        if (!pid) {
-            notify("scripting-addition", "could not locate pid of Dock.app!");
-            warn("yabai: scripting-addition could not locate pid of Dock.app!\n");
-            sleep(1);
-            return 1;
-        }
-
         if (mach_loader_inject_payload(pid)) {
             debug("yabai: scripting-addition successfully injected payload into Dock.app..\n");
             if (drop_sudo_privileges_and_set_sa_socket_path()) {
