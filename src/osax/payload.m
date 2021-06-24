@@ -1,3 +1,4 @@
+#include <CoreGraphics/CoreGraphics.h>
 #include <Foundation/Foundation.h>
 #include <mach-o/getsect.h>
 #include <mach-o/dyld.h>
@@ -226,62 +227,83 @@ static void init_instances()
 
     NSLog(@"[yabai-sa] payload offsets computed relative to %llx", baseaddr);
 #else
-    uint64_t baseaddr = static_base_address() + image_slide();
+    if (os_version.majorVersion == 12) {
+        uint64_t baseaddr = image_slide();
 
-    uint64_t dock_spaces_addr = hex_find_seq(baseaddr + get_dock_spaces_offset(os_version), get_dock_spaces_pattern(os_version));
-    if (dock_spaces_addr == 0) {
-        dock_spaces = nil;
-        NSLog(@"[yabai-sa] could not locate pointer to dock.spaces! spaces functionality will not work!");
-    } else {
-        uint32_t dock_spaces_offset = *(int32_t *)dock_spaces_addr;
-        NSLog(@"[yabai-sa] (0x%llx) dock.spaces found at address 0x%llX (0x%llx)", baseaddr, dock_spaces_addr, dock_spaces_addr - baseaddr);
-        dock_spaces = [(*(id *)(dock_spaces_addr + dock_spaces_offset + 0x4)) retain];
-    }
+        if (payload_compat_base != static_base_address()) {
+            NSLog(@"[yabai-sa] payload offsets not compatible with OS version!");
+            return;
+        }
 
-    uint64_t dppm_addr = hex_find_seq(baseaddr + get_dppm_offset(os_version), get_dppm_pattern(os_version));
-    if (dppm_addr == 0) {
-        dp_desktop_picture_manager = nil;
-        NSLog(@"[yabai-sa] could not locate pointer to dppm! moving spaces will not work!");
-    } else {
-        uint32_t dppm_offset = *(int32_t *)dppm_addr;
-        NSLog(@"[yabai-sa] (0x%llx) dppm found at address 0x%llX (0x%llx)", baseaddr, dppm_addr, dppm_addr - baseaddr);
-        dp_desktop_picture_manager = [(*(id *)(dppm_addr + dppm_offset + 0x4)) retain];
-    }
+        // globals
+        dock_spaces = [(*(id *)(baseaddr + 0x100434CB8ULL)) retain];
+        dp_desktop_picture_manager = [(*(id *)(baseaddr + 0x100434D38ULL)) retain];
 
-    uint64_t add_space_addr = hex_find_seq(baseaddr + get_add_space_offset(os_version), get_add_space_pattern(os_version));
-    if (add_space_addr == 0x0) {
-        NSLog(@"[yabai-sa] failed to get pointer to addSpace function..");
-        add_space_fp = 0;
-    } else {
-        NSLog(@"[yabai-sa] (0x%llx) addSpace found at address 0x%llX (0x%llx)", baseaddr, add_space_addr, add_space_addr - baseaddr);
-        add_space_fp = add_space_addr;
-    }
+        // function pointers
+        add_space_fp = baseaddr + 0x10022F760ULL;
+        remove_space_fp = baseaddr + 0x1002E718AULL;
+        move_space_fp = baseaddr + 0x1002D7D2DULL;
+        set_front_window_fp = baseaddr + 0x100051E40ULL;
 
-    uint64_t remove_space_addr = hex_find_seq(baseaddr + get_remove_space_offset(os_version), get_remove_space_pattern(os_version));
-    if (remove_space_addr == 0x0) {
-        NSLog(@"[yabai-sa] failed to get pointer to removeSpace function..");
-        remove_space_fp = 0;
+        NSLog(@"[yabai-sa] payload offsets computed relative to %llx", baseaddr);
     } else {
-        NSLog(@"[yabai-sa] (0x%llx) removeSpace found at address 0x%llX (0x%llx)", baseaddr, remove_space_addr, remove_space_addr - baseaddr);
-        remove_space_fp = remove_space_addr;
-    }
+        uint64_t baseaddr = static_base_address() + image_slide();
 
-    uint64_t move_space_addr = hex_find_seq(baseaddr + get_move_space_offset(os_version), get_move_space_pattern(os_version));
-    if (move_space_addr == 0x0) {
-        NSLog(@"[yabai-sa] failed to get pointer to moveSpace function..");
-        move_space_fp = 0;
-    } else {
-        NSLog(@"[yabai-sa] (0x%llx) moveSpace found at address 0x%llX (0x%llx)", baseaddr, move_space_addr, move_space_addr - baseaddr);
-        move_space_fp = move_space_addr;
-    }
+        uint64_t dock_spaces_addr = hex_find_seq(baseaddr + get_dock_spaces_offset(os_version), get_dock_spaces_pattern(os_version));
+        if (dock_spaces_addr == 0) {
+            dock_spaces = nil;
+            NSLog(@"[yabai-sa] could not locate pointer to dock.spaces! spaces functionality will not work!");
+        } else {
+            uint32_t dock_spaces_offset = *(int32_t *)dock_spaces_addr;
+            NSLog(@"[yabai-sa] (0x%llx) dock.spaces found at address 0x%llX (0x%llx)", baseaddr, dock_spaces_addr, dock_spaces_addr - baseaddr);
+            dock_spaces = [(*(id *)(dock_spaces_addr + dock_spaces_offset + 0x4)) retain];
+        }
 
-    uint64_t set_front_window_addr = hex_find_seq(baseaddr + get_set_front_window_offset(os_version), get_set_front_window_pattern(os_version));
-    if (set_front_window_addr == 0x0) {
-        NSLog(@"[yabai-sa] failed to get pointer to setFrontWindow function..");
-        set_front_window_fp = 0;
-    } else {
-        NSLog(@"[yabai-sa] (0x%llx) setFrontWindow found at address 0x%llX (0x%llx)", baseaddr, set_front_window_addr, set_front_window_addr - baseaddr);
-        set_front_window_fp = set_front_window_addr;
+        uint64_t dppm_addr = hex_find_seq(baseaddr + get_dppm_offset(os_version), get_dppm_pattern(os_version));
+        if (dppm_addr == 0) {
+            dp_desktop_picture_manager = nil;
+            NSLog(@"[yabai-sa] could not locate pointer to dppm! moving spaces will not work!");
+        } else {
+            uint32_t dppm_offset = *(int32_t *)dppm_addr;
+            NSLog(@"[yabai-sa] (0x%llx) dppm found at address 0x%llX (0x%llx)", baseaddr, dppm_addr, dppm_addr - baseaddr);
+            dp_desktop_picture_manager = [(*(id *)(dppm_addr + dppm_offset + 0x4)) retain];
+        }
+
+        uint64_t add_space_addr = hex_find_seq(baseaddr + get_add_space_offset(os_version), get_add_space_pattern(os_version));
+        if (add_space_addr == 0x0) {
+            NSLog(@"[yabai-sa] failed to get pointer to addSpace function..");
+            add_space_fp = 0;
+        } else {
+            NSLog(@"[yabai-sa] (0x%llx) addSpace found at address 0x%llX (0x%llx)", baseaddr, add_space_addr, add_space_addr - baseaddr);
+            add_space_fp = add_space_addr;
+        }
+
+        uint64_t remove_space_addr = hex_find_seq(baseaddr + get_remove_space_offset(os_version), get_remove_space_pattern(os_version));
+        if (remove_space_addr == 0x0) {
+            NSLog(@"[yabai-sa] failed to get pointer to removeSpace function..");
+            remove_space_fp = 0;
+        } else {
+            NSLog(@"[yabai-sa] (0x%llx) removeSpace found at address 0x%llX (0x%llx)", baseaddr, remove_space_addr, remove_space_addr - baseaddr);
+            remove_space_fp = remove_space_addr;
+        }
+
+        uint64_t move_space_addr = hex_find_seq(baseaddr + get_move_space_offset(os_version), get_move_space_pattern(os_version));
+        if (move_space_addr == 0x0) {
+            NSLog(@"[yabai-sa] failed to get pointer to moveSpace function..");
+            move_space_fp = 0;
+        } else {
+            NSLog(@"[yabai-sa] (0x%llx) moveSpace found at address 0x%llX (0x%llx)", baseaddr, move_space_addr, move_space_addr - baseaddr);
+            move_space_fp = move_space_addr;
+        }
+
+        uint64_t set_front_window_addr = hex_find_seq(baseaddr + get_set_front_window_offset(os_version), get_set_front_window_pattern(os_version));
+        if (set_front_window_addr == 0x0) {
+            NSLog(@"[yabai-sa] failed to get pointer to setFrontWindow function..");
+            set_front_window_fp = 0;
+        } else {
+            NSLog(@"[yabai-sa] (0x%llx) setFrontWindow found at address 0x%llX (0x%llx)", baseaddr, set_front_window_addr, set_front_window_addr - baseaddr);
+            set_front_window_fp = set_front_window_addr;
+        }
     }
 #endif
 
