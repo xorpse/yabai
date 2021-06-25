@@ -12,11 +12,11 @@ Reboot and add boot arguments and reboot again:
 $ sudo nvram boot-args=-arm64e_preview_abi
 ```
 
-Build using the `makefile.arm64`:
+Build using the `makefile`:
 
 ```
-$ make -j1 -f makefile.arm64
-$ make -f makefile.arm64 sign
+$ make -j1
+$ make sign
 ```
 
 # Loading script additions

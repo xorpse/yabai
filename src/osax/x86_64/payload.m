@@ -216,3 +216,5 @@ const char *get_set_front_window_pattern(NSOperatingSystemVersion os_version) {
     }
     return NULL;
 }
+
+const uint64_t payload_compat_base = 0x100000000ULL;

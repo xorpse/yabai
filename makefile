@@ -1,16 +1,23 @@
-FRAMEWORK_PATH = -F/System/Library/PrivateFrameworks
-FRAMEWORK      = -framework Carbon -framework Cocoa -framework CoreServices -framework SkyLight -framework ScriptingBridge
-BUILD_FLAGS    = -std=c99 -Wall -g -O0 -fvisibility=hidden -mmacosx-version-min=10.13
-BUILD_PATH     = ./bin
-DOC_PATH       = ./doc
-SCRIPT_PATH    = ./scripts
-ASSET_PATH     = ./assets
-SMP_PATH       = ./examples
-ARCH_PATH      = ./archive
-OSAX_SRC       = ./src/osax/sa_loader.c ./src/osax/sa_payload.c ./src/osax/sa_mach_bootstrap.c
-YABAI_SRC      = ./src/manifest.m $(OSAX_SRC)
-OSAX_PATH      = ./src/osax
-BINS           = $(BUILD_PATH)/yabai
+FRAMEWORK_PATH        = -F/System/Library/PrivateFrameworks
+FRAMEWORK             = -framework Carbon -framework Cocoa -framework CoreServices -framework SkyLight -framework ScriptingBridge
+BUILD_FLAGS           = -std=c99 -Wall -g -O0 -fvisibility=hidden -mmacosx-version-min=10.13
+BUILD_PATH            = ./bin
+DOC_PATH              = ./doc
+SCRIPT_PATH           = ./scripts
+ASSET_PATH            = ./assets
+SMP_PATH              = ./examples
+ARCH_PATH             = ./archive
+OSAX_PATH             = ./src/osax
+
+OSAX_X86_64_SRC       = $(OSAX_PATH)/sa_loader.c $(OSAX_PATH)/sa_mach_bootstrap.c $(OSAX_PATH)/sa_payload.c
+YABAI_X86_64_SRC      = ./src/manifest.m $(OSAX_X86_64_SRC)
+
+OSAX_ARM_INJECTOR_SRC = $(OSAX_PATH)/arm64/injector.o
+OSAX_ARM_SA_SRC       = $(OSAX_PATH)/arm64/sa_arm64e.h $(OSAX_PATH)/arm64/sa_arm64e.o
+OSAX_ARM_SRC          = $(OSAX_PATH)/arm64/injector.o $(OSAX_PATH)/sa_payload.c
+YABAI_ARM_SRC         = ./src/manifest.m $(OSAX_ARM_SRC)
+
+BINS                  = $(BUILD_PATH)/yabai $(BUILD_PATH)/yabai-x86_64 $(BUILD_PATH)/yabai-arm64
 
 .PHONY: all clean install sign archive man
 
@@ -19,16 +26,27 @@ all: clean-build $(BINS)
 install: BUILD_FLAGS=-std=c99 -Wall -DNDEBUG -O2 -fvisibility=hidden -mmacosx-version-min=10.13
 install: clean-build $(BINS)
 
-$(OSAX_SRC): $(OSAX_PATH)/loader.m $(OSAX_PATH)/payload.m $(OSAX_PATH)/mach_bootstrap.c
-	clang $(OSAX_PATH)/loader.m -shared -O2 -mmacosx-version-min=10.13 -o $(OSAX_PATH)/loader -framework Foundation
-	clang $(OSAX_PATH)/payload.m -shared -fPIC -O2 -mmacosx-version-min=10.13 -o $(OSAX_PATH)/payload -framework Foundation -framework Carbon
-	clang $(OSAX_PATH)/mach_bootstrap.c -shared -fPIC -O2 -mmacosx-version-min=10.13 -o $(OSAX_PATH)/mach_bootstrap -framework Carbon -lpthread
+$(OSAX_X86_64_SRC): $(OSAX_PATH)/loader.m $(OSAX_PATH)/mach_bootstrap.c $(OSAX_PATH)/payload.m
+	clang $(OSAX_PATH)/loader.m -shared -O2 -mmacosx-version-min=10.13 -arch x86_64 -o $(OSAX_PATH)/loader -framework Foundation
+	clang $(OSAX_PATH)/mach_bootstrap.c -shared -fPIC -O2 -mmacosx-version-min=10.13 -arch x86_64 -o $(OSAX_PATH)/mach_bootstrap -framework Carbon -lpthread
 	xxd -i -a $(OSAX_PATH)/loader $(OSAX_PATH)/sa_loader.c
-	xxd -i -a $(OSAX_PATH)/payload $(OSAX_PATH)/sa_payload.c
 	xxd -i -a $(OSAX_PATH)/mach_bootstrap $(OSAX_PATH)/sa_mach_bootstrap.c
 	rm -f $(OSAX_PATH)/loader
-	rm -f $(OSAX_PATH)/payload
 	rm -f $(OSAX_PATH)/mach_bootstrap
+
+$(OSAX_PATH)/sa_payload.c: $(OSAX_PATH)/payload.m
+	clang $(OSAX_PATH)/payload.m -shared -fPIC -O2 -mmacosx-version-min=10.13 -arch x86_64 -arch arm64e -o $(OSAX_PATH)/payload -framework Foundation -framework Carbon
+	xxd -i -a $(OSAX_PATH)/payload $(OSAX_PATH)/sa_payload.c
+	rm -f $(OSAX_PATH)/payload
+
+$(OSAX_ARM_INJECTOR_SRC): $(OSAX_PATH)/arm64/sa_arm64e.o $(OSAX_PATH)/arm64/injector.c
+	dd if=$(OSAX_PATH)/arm64/sa_arm64e.o of=$(OSAX_PATH)/arm64/sa_arm64e bs=1 count=$(shell otool -l $(OSAX_PATH)/arm64/sa_arm64e.o | grep filesize | sed 's/ filesize //') skip=$(shell otool -l $(OSAX_PATH)/arm64/sa_arm64e.o | grep fileoff | sed 's/  fileoff //')
+	xxd -i -a $(OSAX_PATH)/arm64/sa_arm64e $(OSAX_PATH)/arm64/sa_arm64e.h
+	clang -c $(OSAX_PATH)/arm64/injector.c -o $(OSAX_PATH)/arm64/injector.o -arch arm64e -isysroot "$(shell xcrun --sdk macosx --show-sdk-path)"
+	rm -f $(OSAX_PATH)/arm64/sa_arm64e
+
+$(OSAX_ARM_SA_SRC): $(OSAX_PATH)/arm64/sa_arm64e.s
+	as -o $(OSAX_PATH)/arm64/sa_arm64e.o $(OSAX_PATH)/arm64/sa_arm64e.s
 
 man:
 	asciidoctor -b manpage $(DOC_PATH)/yabai.asciidoc -o $(DOC_PATH)/yabai.1
@@ -52,8 +70,15 @@ clean-build:
 	rm -rf $(BUILD_PATH)
 
 clean: clean-build
-	rm -f $(OSAX_SRC)
+	rm -f $(OSAX_ARM_SRC) $(OSAX_X86_64_SRC)
 
-$(BUILD_PATH)/yabai: $(YABAI_SRC)
+$(BUILD_PATH)/yabai-x86_64: $(YABAI_X86_64_SRC)
 	mkdir -p $(BUILD_PATH)
-	clang $^ $(BUILD_FLAGS) $(FRAMEWORK_PATH) $(FRAMEWORK) -o $@
+	clang $^ -arch x86_64 $(BUILD_FLAGS) $(FRAMEWORK_PATH) $(FRAMEWORK) -o $@
+
+$(BUILD_PATH)/yabai-arm64: $(YABAI_ARM_SRC)
+	mkdir -p $(BUILD_PATH)
+	clang $^ -arch arm64e $(BUILD_FLAGS) $(FRAMEWORK_PATH) $(FRAMEWORK) -o $@
+
+$(BUILD_PATH)/yabai: $(BUILD_PATH)/yabai-x86_64 $(BUILD_PATH)/yabai-arm64
+	lipo -create $(BUILD_PATH)/yabai-x86_64 $(BUILD_PATH)/yabai-arm64 -output $(BUILD_PATH)/yabai
