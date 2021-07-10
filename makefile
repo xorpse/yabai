@@ -8,6 +8,8 @@ ASSET_PATH            = ./assets
 SMP_PATH              = ./examples
 ARCH_PATH             = ./archive
 OSAX_PATH             = ./src/osax
+CLANG_PATH            = /Library/Developer/CommandLineTools/usr/bin/clang
+SDK_PATH              = $(shell xcrun --sdk macosx --show-sdk-path)
 
 OSAX_X86_64_SRC       = $(OSAX_PATH)/sa_loader.c $(OSAX_PATH)/sa_mach_bootstrap.c $(OSAX_PATH)/sa_payload.c
 YABAI_X86_64_SRC      = ./src/manifest.m $(OSAX_X86_64_SRC)
@@ -27,22 +29,22 @@ install: BUILD_FLAGS=-std=c99 -Wall -DNDEBUG -O2 -fvisibility=hidden -mmacosx-ve
 install: clean-build $(BINS)
 
 $(OSAX_X86_64_SRC): $(OSAX_PATH)/loader.m $(OSAX_PATH)/mach_bootstrap.c $(OSAX_PATH)/payload.m
-	clang $(OSAX_PATH)/loader.m -shared -O2 -mmacosx-version-min=10.13 -arch x86_64 -o $(OSAX_PATH)/loader -framework Foundation
-	clang $(OSAX_PATH)/mach_bootstrap.c -shared -fPIC -O2 -mmacosx-version-min=10.13 -arch x86_64 -o $(OSAX_PATH)/mach_bootstrap -framework Carbon -lpthread
+	$(CLANG_PATH) $(OSAX_PATH)/loader.m -shared -O2 -mmacosx-version-min=10.13 -arch x86_64 -o $(OSAX_PATH)/loader -isysroot "$(SDK_PATH)" -framework Foundation
+	$(CLANG_PATH) $(OSAX_PATH)/mach_bootstrap.c -shared -fPIC -O2 -mmacosx-version-min=10.13 -arch x86_64 -o $(OSAX_PATH)/mach_bootstrap -isysroot "$(SDK_PATH)" -framework Carbon -lpthread
 	xxd -i -a $(OSAX_PATH)/loader $(OSAX_PATH)/sa_loader.c
 	xxd -i -a $(OSAX_PATH)/mach_bootstrap $(OSAX_PATH)/sa_mach_bootstrap.c
 	rm -f $(OSAX_PATH)/loader
 	rm -f $(OSAX_PATH)/mach_bootstrap
 
 $(OSAX_PATH)/sa_payload.c: $(OSAX_PATH)/payload.m
-	clang $(OSAX_PATH)/payload.m -shared -fPIC -O2 -mmacosx-version-min=10.13 -arch x86_64 -arch arm64e -o $(OSAX_PATH)/payload -framework Foundation -framework Carbon
+	$(CLANG_PATH) $(OSAX_PATH)/payload.m -shared -fPIC -O2 -mmacosx-version-min=10.13 -arch x86_64 -arch arm64e -o $(OSAX_PATH)/payload -isysroot "$(SDK_PATH)" -framework Foundation -framework Carbon
 	xxd -i -a $(OSAX_PATH)/payload $(OSAX_PATH)/sa_payload.c
 	rm -f $(OSAX_PATH)/payload
 
 $(OSAX_ARM_INJECTOR_SRC): $(OSAX_PATH)/arm64/sa_arm64e.o $(OSAX_PATH)/arm64/injector.c
 	dd if=$(OSAX_PATH)/arm64/sa_arm64e.o of=$(OSAX_PATH)/arm64/sa_arm64e bs=1 count=$(shell otool -l $(OSAX_PATH)/arm64/sa_arm64e.o | grep filesize | sed 's/ filesize //') skip=$(shell otool -l $(OSAX_PATH)/arm64/sa_arm64e.o | grep fileoff | sed 's/  fileoff //')
 	xxd -i -a $(OSAX_PATH)/arm64/sa_arm64e $(OSAX_PATH)/arm64/sa_arm64e.h
-	clang -c $(OSAX_PATH)/arm64/injector.c -o $(OSAX_PATH)/arm64/injector.o -arch arm64e -isysroot "$(shell xcrun --sdk macosx --show-sdk-path)"
+	$(CLANG_PATH) -c $(OSAX_PATH)/arm64/injector.c -o $(OSAX_PATH)/arm64/injector.o -arch arm64e -isysroot "$(SDK_PATH)"
 	rm -f $(OSAX_PATH)/arm64/sa_arm64e
 
 $(OSAX_ARM_SA_SRC): $(OSAX_PATH)/arm64/sa_arm64e.s
@@ -74,11 +76,11 @@ clean: clean-build
 
 $(BUILD_PATH)/yabai-x86_64: $(YABAI_X86_64_SRC)
 	mkdir -p $(BUILD_PATH)
-	clang $^ -arch x86_64 $(BUILD_FLAGS) $(FRAMEWORK_PATH) $(FRAMEWORK) -o $@
+	$(CLANG_PATH) $^ -arch x86_64 $(BUILD_FLAGS) $(FRAMEWORK_PATH) $(FRAMEWORK) -isysroot "$(SDK_PATH)" -o $@
 
 $(BUILD_PATH)/yabai-arm64: $(YABAI_ARM_SRC)
 	mkdir -p $(BUILD_PATH)
-	clang $^ -arch arm64e $(BUILD_FLAGS) $(FRAMEWORK_PATH) $(FRAMEWORK) -o $@
+	$(CLANG_PATH) $^ -arch arm64e $(BUILD_FLAGS) $(FRAMEWORK_PATH) $(FRAMEWORK) -isysroot "$(SDK_PATH)" -o $@
 
 $(BUILD_PATH)/yabai: $(BUILD_PATH)/yabai-x86_64 $(BUILD_PATH)/yabai-arm64
 	lipo -create $(BUILD_PATH)/yabai-x86_64 $(BUILD_PATH)/yabai-arm64 -output $(BUILD_PATH)/yabai
