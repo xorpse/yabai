@@ -13,6 +13,8 @@ OSAX_PATH      = ./src/osax
 OSAX_SRC_ARMSA = $(OSAX_PATH)/arm64/sa_arm64e.h $(OSAX_PATH)/arm64/sa_arm64e.o
 OSAX_SRC_ARM   = $(OSAX_PATH)/arm64/injector.o
 BINS           = $(BUILD_PATH)/yabai
+CLANG_PATH            = /Library/Developer/CommandLineTools/usr/bin/clang
+SDK_PATH              = $(shell xcrun --sdk macosx --show-sdk-path)
 
 .PHONY: all clean install sign archive man
 
@@ -22,14 +24,14 @@ install: BUILD_FLAGS=-std=c99 -Wall -DNDEBUG -O2 -fvisibility=hidden -mmacosx-ve
 install: clean-build $(BINS)
 
 $(OSAX_SRC): $(OSAX_PATH)/payload.m $(OSAX_SRC_ARM)
-	clang $(OSAX_PATH)/payload.m -shared -fPIC -O2 -mmacosx-version-min=10.13 -arch arm64e -o $(OSAX_PATH)/payload -framework Foundation -framework Carbon
+	$(CLANG_PATH) $(OSAX_PATH)/payload.m -shared -fPIC -O2 -mmacosx-version-min=10.13 -arch arm64e -o $(OSAX_PATH)/payload -isysroot "$(SDK_PATH)" -framework Foundation -framework Carbon
 	xxd -i -a $(OSAX_PATH)/payload $(OSAX_PATH)/sa_payload.c
 	rm -f $(OSAX_PATH)/payload
 
 $(OSAX_SRC_ARM): $(OSAX_PATH)/arm64/sa_arm64e.o $(OSAX_PATH)/arm64/injector.c
 	dd if=$(OSAX_PATH)/arm64/sa_arm64e.o of=$(OSAX_PATH)/arm64/sa_arm64e bs=1 count=$(shell otool -l $(OSAX_PATH)/arm64/sa_arm64e.o | grep filesize | sed 's/ filesize //') skip=$(shell otool -l $(OSAX_PATH)/arm64/sa_arm64e.o | grep fileoff | sed 's/  fileoff //')
 	xxd -i -a $(OSAX_PATH)/arm64/sa_arm64e $(OSAX_PATH)/arm64/sa_arm64e.h
-	clang -c $(OSAX_PATH)/arm64/injector.c -o $(OSAX_PATH)/arm64/injector.o -arch arm64e -isysroot "$(shell xcrun --sdk macosx --show-sdk-path)"
+	$(CLANG_PATH) -c $(OSAX_PATH)/arm64/injector.c -o $(OSAX_PATH)/arm64/injector.o -arch arm64e -isysroot "$(SDK_PATH)"
 	rm -f $(OSAX_PATH)/arm64/sa_arm64e
 
 $(OSAX_SRC_ARMSA): $(OSAX_PATH)/arm64/sa_arm64e.s
@@ -61,4 +63,4 @@ clean: clean-build
 
 $(BUILD_PATH)/yabai: $(YABAI_SRC)
 	mkdir -p $(BUILD_PATH)
-	clang $^ $(BUILD_FLAGS) -arch arm64e $(FRAMEWORK_PATH) $(FRAMEWORK) -o $@
+	$(CLANG_PATH) $^ $(BUILD_FLAGS) -arch arm64e $(FRAMEWORK_PATH) $(FRAMEWORK) -isysroot "$(SDK_PATH)" -o $@
