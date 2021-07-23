@@ -21,6 +21,8 @@ YABAI_ARM_SRC         = ./src/manifest.m $(OSAX_ARM_SRC)
 
 BINS                  = $(BUILD_PATH)/yabai $(BUILD_PATH)/yabai-x86_64 $(BUILD_PATH)/yabai-arm64
 
+MARKDOWN_CAT = $(if $(shell which glow),glow,cat)
+
 .PHONY: all clean install sign archive man
 
 all: clean-build $(BINS)
@@ -79,6 +81,7 @@ $(BUILD_PATH)/yabai-x86_64: $(YABAI_X86_64_SRC)
 	$(CLANG_PATH) $^ -arch x86_64 $(BUILD_FLAGS) $(FRAMEWORK_PATH) $(FRAMEWORK) -isysroot "$(SDK_PATH)" -o $@
 
 $(BUILD_PATH)/yabai-arm64: $(YABAI_ARM_SRC)
+	sysctl kern.bootargs | grep -q -- -arm64e_preview_abi || (echo >&2 "\n\nBooted w/o arm64e ABI support!"; $(MARKDOWN_CAT) README-arm64.md >&2; exit 1) #technically we can build the binary w/o the abi enabled, but output will be immediately SIGSEVEd
 	mkdir -p $(BUILD_PATH)
 	$(CLANG_PATH) $^ -arch arm64e $(BUILD_FLAGS) $(FRAMEWORK_PATH) $(FRAMEWORK) -isysroot "$(SDK_PATH)" -o $@
 
