@@ -29,6 +29,7 @@ bool scripting_addition_set_shadow(uint32_t wid, bool shadow);
 bool scripting_addition_focus_window(uint32_t wid);
 bool scripting_addition_scale_window(uint32_t wid, float x, float y, float w, float h);
 
+extern bool workspace_is_macos_monterey(void);
 extern bool workspace_is_macos_bigsur(void);
 extern bool workspace_is_macos_highsierra(void);
 
